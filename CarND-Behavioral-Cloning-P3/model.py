@@ -27,6 +27,9 @@ for line in lines:
 	image = cv2.imread(current_path)
 	images.append(image)
 
+	measurement = float(line[3])
+	measurements.append(measurement)
+	
 	#Add left image
 	left_source_path = line[1]
 	#print(source_path)	
@@ -36,6 +39,8 @@ for line in lines:
 	image = cv2.imread(current_path)
 	images.append(image)
 
+	measurements.append(measurement)
+	
 	#Add right image
 	right_source_path = line[2]
 	#print(source_path)	
@@ -45,8 +50,6 @@ for line in lines:
 	image = cv2.imread(current_path)
 	images.append(image)
 
-
-	measurement = float(line[3])
 	measurements.append(measurement)
 
 x_train = np.array(images)
