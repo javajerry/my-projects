@@ -14,15 +14,38 @@ with open('driving_log.csv') as csvfile:
 
 images=[]
 measurements = []
+image_path = 'IMG/'
+
 print('read csv file')
 for line in lines:
-	source_path = line[0]
+	#Add center image
+	center_source_path = line[0]
 	#print(source_path)	
-	filename = source_path.split('\\')[-1]
+	filename = center_source_path.split('\\')[-1]
 	#print(filename)
-	current_path = 'IMG/' + filename
+	current_path = image_path + filename
 	image = cv2.imread(current_path)
 	images.append(image)
+
+	#Add left image
+	left_source_path = line[1]
+	#print(source_path)	
+	filename = left_source_path.split('\\')[-1]
+	#print(filename)
+	current_path = image_path + filename
+	image = cv2.imread(current_path)
+	images.append(image)
+
+	#Add right image
+	right_source_path = line[2]
+	#print(source_path)	
+	filename = right_source_path.split('\\')[-1]
+	#print(filename)
+	current_path = image_path + filename
+	image = cv2.imread(current_path)
+	images.append(image)
+
+
 	measurement = float(line[3])
 	measurements.append(measurement)
 
