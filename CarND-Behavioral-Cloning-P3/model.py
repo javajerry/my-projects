@@ -5,7 +5,8 @@ import numpy as np
 import tensorflow as tf
 from sklearn.utils import shuffle
 from keras.models import Sequential
-from keras.layers import Flatten, Dense, Lambda, Cropping2D, Dropout
+from keras.layers.core import Flatten, Dense, Lambda, Dropout, Activation
+from keras.layers import Cropping2D
 from keras.layers.convolutional import Convolution2D
 from keras.layers.pooling import MaxPooling2D
 from keras.callbacks import EarlyStopping
