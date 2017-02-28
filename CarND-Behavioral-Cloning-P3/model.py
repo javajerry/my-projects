@@ -103,9 +103,9 @@ def generator(samples, batch_size=32):
 				angles.append(0 - (angle - correction))			
 
 		x_train = np.array(images)
-		print('x_train shape', x_train.shape)
+		#print('x_train shape', x_train.shape)
 		y_train = np.array(angles)	
-		print('y_train ', len(y_train))
+		#print('y_train ', len(y_train))
 		yield shuffle(x_train, y_train)
 
 #based on LeNet Architecture
@@ -126,8 +126,8 @@ def LeNet_model(ch, row, col):
 
 def nvidia_model(ch, row, col):
 	model = Sequential()
-	#model.add(Cropping2D(cropping=((50,20), (0,0)), input_shape=(160,320,3)))
 	model.add(Lambda(lambda x: (x / 255.0) - 0.5, input_shape=(row, col, ch)))
+	model.add(Cropping2D(cropping=((50,20), (0,0)), input_shape=(160,320,3)))
 	model.add(Convolution2D(24, 5, 5, subsample=(2,2), activation="relu"))
 	model.add(Convolution2D(36, 5, 5, subsample=(2,2), activation="relu"))
 	model.add(Convolution2D(48, 5, 5, subsample=(2,2), activation="relu"))
@@ -135,8 +135,10 @@ def nvidia_model(ch, row, col):
 	model.add(Convolution2D(64, 3, 3, activation="relu"))	
 	model.add(Flatten())
 	model.add(Dense(100))
+	model.add(Activation('relu'))
 	model.add(Dense(50))
-	model.add(Dense(10))
+	model.add(Activation('relu'))	
+	model.add(Dense(10))	
 	model.add(Dense(1))
 	return model;
 
@@ -146,8 +148,8 @@ def main(_):
 
 	ch, row, col = 3, 160, 320  # Trimmed image format
 
-	model = LeNet_model(ch, row, col);
-	#model = nvidia_model(ch, row, col);
+	#model = LeNet_model(ch, row, col);
+	model = nvidia_model(ch, row, col);
 
 	model.summary()
 	plot(model, to_file='model.png', show_shapes=True)
