@@ -146,8 +146,8 @@ def nvidia_model(ch, row, col, dropout=0.4):
 	#model.add(MaxPooling2D())
 	model.add(Convolution2D(48, 5, 5, subsample=(2,2), activation="relu"))
 	#model.add(MaxPooling2D())
-	model.add(Convolution2D(64, 3, 3, activation="relu"))
-	model.add(Convolution2D(64, 3, 3, activation="relu"))	
+	#model.add(Convolution2D(64, 3, 3, activation="relu"))
+	#model.add(Convolution2D(64, 3, 3, activation="relu"))	
 
 	model.add(Flatten())
 	model.add(Dense(100))
