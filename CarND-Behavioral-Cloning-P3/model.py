@@ -2,6 +2,7 @@ import os
 import csv
 import cv2
 import numpy as np
+import random
 import matplotlib.pyplot as plt
 import tensorflow as tf
 from sklearn.utils import shuffle
@@ -12,31 +13,88 @@ from keras.layers.convolutional import Convolution2D
 from keras.layers.pooling import MaxPooling2D
 from keras.callbacks import EarlyStopping
 from keras.utils.visualize_util import plot
+matplotlib.use('Agg')
 
 samples = []
 print('read csv file')
 
-count = 0 
+zero_steering_threshold=1000
+zero_steering_count = 0 
 with open('driving_log.csv') as csvfile:
 	reader = csv.reader(csvfile)
 	for line in reader:
-		#ignore data when car isnt moving
-		if float(line[4]) > 0 and float(line[6]) > 0:
+		#samples.append(line)
+		#downsample zero steering data
+		if (float(line[3]) > 0.03 and float(line[3]) < -0.03) and zero_steering_count <= zero_steering_threshold:
 			samples.append(line)
+			zero_steering_count += 1
 		else:
-			count += 1
+			samples.append(line)
 print('Found samples ', len(samples))
-print('Ignored samples ', count)
+#print('Ignored samples ', count)
 
 from sklearn.model_selection import train_test_split
 train_samples, validation_samples = train_test_split(samples, test_size=0.2)		
 
 image_path = 'IMG/'
-correction = 0.1
+correction = 0.2
+ch, row, col = 3, 160, 320  # Trimmed image format
+
+
+filters=[3,3]
+
+center_image_choices = ['Brightness', 'WrapAffine']
+lr_image_choices = ['Flip', 'Brightness', 'WrapAffine']
 
 #crop images
 def crop(image):
     return image[50:-20,:]
+
+'''
+For data augmentation, random brightness
+'''
+def random_brightness(image):
+    image1 = cv2.cvtColor(image,cv2.COLOR_RGB2HSV)
+    image1 = np.array(image1, dtype = np.float64)
+    random_bright = .5+np.random.uniform()
+    image1[:,:,2] = image1[:,:,2]*random_bright
+    image1[:,:,2][image1[:,:,2]>255]  = 255
+    image1 = np.array(image1, dtype = np.uint8)
+    image1 = cv2.cvtColor(image1,cv2.COLOR_HSV2RGB)
+    return image1
+
+#wrap affine
+def trans_image(image,steer, trans_range=100):
+    # Translation
+    tr_x = trans_range*np.random.uniform()-trans_range/2
+    steer_ang = steer + tr_x/trans_range*2*.2
+    tr_y = 40*np.random.uniform()-40/2
+    #tr_y = 0
+    Trans_M = np.float32([[1,0,tr_x],[0,1,tr_y]])
+    image_tr = cv2.warpAffine(image,Trans_M,(col,row))
+    
+    return image_tr,steer_ang
+
+def augment_center_image(image, angle):
+	choice = random.choice(center_image_choices)
+
+	if choice == 'Brightness':
+		image = random_brightness(image)
+	elif choice == 'WrapAffine':
+		image, angle = trans_image(image, angle)
+	return image, angle
+
+def augment_lr_image(image, angle):
+	choice = random.choice(center_image_choices)
+
+	if choice == 'Brightness':
+		image = random_brightness(image)
+	elif choice == 'WrapAffine':
+		image, angle = trans_image(image, angle)
+	elif choice == 'Flip':
+		image = np.fliplr(image) 
+		angle = -angle
+	return image, angle
 
 # samples generator
 def generator(samples, batch_size=32):
@@ -69,11 +127,9 @@ def generator(samples, batch_size=32):
 				#print('angle ', angle)
 				angles.append(angle)
 
-				#Add flipped image also. ignore  flipping is steering angle=0
-				if ( angle != 0):
-					image = np.fliplr(image)
-					images.append(image)
-					angles.append(angle*-1.0)			
+				image, angle = augment_center_image(image, angle)
+				images.append(image)
+				angles.append(angle)			
 		
 				#Add left image
 				left_source_path = batch_sample[1]
@@ -81,6 +137,7 @@ def generator(samples, batch_size=32):
 				filename = left_source_path.split('\\')[-1]
 				#print(filename)
 				current_path = image_path + filename
+				#print(current_path)
 				image = cv2.imread(current_path)
 				#crop the image
 				#image = crop(image)
@@ -89,10 +146,9 @@ def generator(samples, batch_size=32):
 				angles.append(angle + correction)
 				
 				#Add flipped image also
-				if ( angle != 0):
-					image = np.fliplr(image)
-					images.append(image)
-					angles.append((angle + correction)*-1.0)			
+				image, angle = augment_lr_image(image, angle)
+				images.append(image)
+				angles.append((angle + correction))			
 
 				#Add right image
 				right_source_path = batch_sample[2]
@@ -108,10 +164,9 @@ def generator(samples, batch_size=32):
 				angles.append(angle - correction)
 
 				#Add flipped image also
-				if ( angle != 0):
-					image = np.fliplr(image)
-					images.append(image)
-					angles.append((angle - correction)*-1.0)			
+				image, angle = augment_lr_image(image, angle)
+				images.append(image)
+				angles.append((angle - correction))			
 
 		x_train = np.array(images)
 		#print('x_train shape', x_train.shape)
@@ -140,31 +195,29 @@ def nvidia_model(ch, row, col, dropout=0.4):
 	model.add(Lambda(lambda x: (x / 255.0) - 0.5, input_shape=(row, col, ch)))
 	#model.add(Lambda(lambda x: (x / 127.5) - 1., input_shape=(row, col, ch)))
 	model.add(Cropping2D(cropping=((50,20), (0,0)), input_shape=(160,320,3)))
-	model.add(Convolution2D(24, 5, 5, subsample=(2,2), activation="relu"))
+	model.add(Convolution2D(24, filters[0], filters[1], subsample=(2,2), activation="relu"))
 	#model.add(MaxPooling2D())	
-	model.add(Convolution2D(36, 5, 5, subsample=(2,2), activation="relu"))
+	model.add(Convolution2D(36, filters[0], filters[1], subsample=(2,2), activation="relu"))
 	#model.add(MaxPooling2D())
-	model.add(Convolution2D(48, 5, 5, subsample=(2,2), activation="relu"))
+	model.add(Convolution2D(48, filters[0], filters[1], subsample=(2,2), activation="relu"))
 	#model.add(MaxPooling2D())
-	model.add(Convolution2D(64, 3, 3, activation="relu"))
-	model.add(Convolution2D(64, 3, 3, activation="relu"))	
+	#model.add(Convolution2D(64, 3, 3, activation="relu"))
+	#model.add(Convolution2D(64, 3, 3, activation="relu"))	
 
 	model.add(Flatten())
 	model.add(Dense(100))
-	model.add(Activation('relu'))
+	#model.add(Activation('relu'))
 	model.add(Dropout(dropout))
 	model.add(Dense(50))	
-	model.add(Activation('relu'))
+	#model.add(Activation('relu'))
 	model.add(Dropout(dropout))
 	model.add(Dense(10))
 	model.add(Dense(1))
 	return model;
 
 def main(_):
-	train_generator = generator(train_samples, batch_size=64)
-	validation_generator = generator(validation_samples, batch_size=64)
-
-	ch, row, col = 3, 160, 320  # Trimmed image format
+	train_generator = generator(train_samples, batch_size=128)
+	validation_generator = generator(validation_samples, batch_size=128)
 
 	#model = LeNet_model(ch, row, col);
 	model = nvidia_model(ch, row, col);
