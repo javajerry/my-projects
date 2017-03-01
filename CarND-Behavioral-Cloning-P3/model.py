@@ -15,17 +15,23 @@ from keras.utils.visualize_util import plot
 samples = []
 print('read csv file')
 
+count = 0 
 with open('driving_log.csv') as csvfile:
 	reader = csv.reader(csvfile)
 	for line in reader:
-		samples.append(line)
+		#ignore data when car isnt moving
+		if float(line[6]) > 0:
+			samples.append(line)
+		else:
+			count += 1
 print('Found samples ', len(samples))
+print('Ignored samples ', count)
 
 from sklearn.model_selection import train_test_split
 train_samples, validation_samples = train_test_split(samples, test_size=0.2)		
 
 image_path = 'IMG/'
-correction = 0.2
+correction = 0.1
 
 #crop images
 def crop(image):
@@ -62,10 +68,11 @@ def generator(samples, batch_size=32):
 				#print('angle ', angle)
 				angles.append(angle)
 
-				#Add flipped image also
-				image = np.fliplr(image)
-				images.append(image)
-				angles.append(0-angle)			
+				#Add flipped image also. ignore  flipping is steering angle=0
+				if ( angle <> 0):
+					image = np.fliplr(image)
+					images.append(image)
+					angles.append(angle*-1.0)			
 		
 				#Add left image
 				left_source_path = batch_sample[1]
@@ -81,9 +88,10 @@ def generator(samples, batch_size=32):
 				angles.append(angle + correction)
 				
 				#Add flipped image also
-				image = np.fliplr(image)
-				images.append(image)
-				angles.append(0 - (angle + correction))			
+				if ( angle <> 0):
+					image = np.fliplr(image)
+					images.append(image)
+					angles.append((angle + correction)*-1.0)			
 
 				#Add right image
 				right_source_path = batch_sample[2]
@@ -99,9 +107,10 @@ def generator(samples, batch_size=32):
 				angles.append(angle - correction)
 
 				#Add flipped image also
-				image = np.fliplr(image)
-				images.append(image)
-				angles.append(0 - (angle - correction))			
+				if ( angle <> 0):
+					image = np.fliplr(image)
+					images.append(image)
+					angles.append((angle - correction)*-1.0)			
 
 		x_train = np.array(images)
 		#print('x_train shape', x_train.shape)
@@ -125,21 +134,28 @@ def LeNet_model(ch, row, col):
 	model.add(Dense(1))
 	return model;
 
-def nvidia_model(ch, row, col):
+def nvidia_model(ch, row, col, dropout=0.4):
 	model = Sequential()
-	model.add(Lambda(lambda x: (x / 255.0) - 0.5, input_shape=(row, col, ch)))
+	#model.add(Lambda(lambda x: (x / 255.0) - 0.5, input_shape=(row, col, ch)))
+	model.add(Lambda(lambda x: (x / 127.5) - 1., input_shape=(row, col, ch)))
 	model.add(Cropping2D(cropping=((50,20), (0,0)), input_shape=(160,320,3)))
 	model.add(Convolution2D(24, 5, 5, subsample=(2,2), activation="relu"))
+	model.add(MaxPooling2D())	
 	model.add(Convolution2D(36, 5, 5, subsample=(2,2), activation="relu"))
+	model.add(MaxPooling2D())
 	model.add(Convolution2D(48, 5, 5, subsample=(2,2), activation="relu"))
-	model.add(Convolution2D(64, 3, 3, activation="relu"))
-	model.add(Convolution2D(64, 3, 3, activation="relu"))	
+	model.add(MaxPooling2D())
+	#model.add(Convolution2D(64, 3, 3, activation="relu"))
+	#model.add(Convolution2D(64, 3, 3, activation="relu"))	
+
 	model.add(Flatten())
 	model.add(Dense(100))
 	model.add(Activation('relu'))
-	model.add(Dense(50))
-	model.add(Activation('relu'))	
-	model.add(Dense(10))	
+	model.add(Dropout(dropout))
+	model.add(Dense(50))	
+	model.add(Activation('relu'))
+	model.add(Dropout(dropout))
+	model.add(Dense(10))
 	model.add(Dense(1))
 	return model;
 
