@@ -3,6 +3,10 @@ import csv
 import cv2
 import numpy as np
 import random
+import pprint as pp
+from scipy.stats import kurtosis, skew, describe
+from itertools import filterfalse
+import matplotlib
 import matplotlib.pyplot as plt
 import tensorflow as tf
 from sklearn.utils import shuffle
@@ -16,6 +20,7 @@ from keras.utils.visualize_util import plot
 matplotlib.use('Agg')
 
 samples = []
+steer_angles = []
 print('read csv file')
 
 zero_steering_threshold=1000
@@ -23,13 +28,15 @@ zero_steering_count = 0
 with open('driving_log.csv') as csvfile:
 	reader = csv.reader(csvfile)
 	for line in reader:
-		#samples.append(line)
+		samples.append(line)
+		# collect steering angles
+		steer_angles.append(float(line[3]))
 		#downsample zero steering data
-		if (float(line[3]) > 0.03 and float(line[3]) < -0.03) and zero_steering_count <= zero_steering_threshold:
-			samples.append(line)
-			zero_steering_count += 1
-		else:
-			samples.append(line)
+		#if (float(line[3]) > 0.03 and float(line[3]) < -0.03) and zero_steering_count <= zero_steering_threshold:
+		#	samples.append(line)
+		#	zero_steering_count += 1
+		#else:
+		#	samples.append(line)
 print('Found samples ', len(samples))
 #print('Ignored samples ', count)
 
@@ -44,7 +51,7 @@ ch, row, col = 3, 160, 320  # Trimmed image format
 filters=[3,3]
 
 center_image_choices = ['Brightness', 'WrapAffine']
-lr_image_choices = ['Flip', 'Brightness', 'WrapAffine']
+lr_image_choices = ['None', 'Flip', 'Brightness', 'WrapAffine']
 
 #crop images
 def crop(image):
@@ -97,7 +104,7 @@ def augment_lr_image(image, angle):
 	return image, angle
 
 # samples generator
-def generator(samples, batch_size=32):
+def generator(samples, training=false, batch_size=32):
     
 	num_samples = len(samples)
 
@@ -174,6 +181,55 @@ def generator(samples, batch_size=32):
 		#print('y_train ', len(y_train))
 		yield shuffle(x_train, y_train)
 
+def generator2(samples, batch_size=32):
+    
+	num_samples = len(samples)
+    
+	while 1: # Loop forever so the generator never terminates
+
+		images = []
+		angles = []
+
+		for batch_idx in range(batch_size):
+			#pick any random image
+			rand_idx = random.randint(num_samples)
+			#pick any random center 0,left 1, right 2 image
+			rand_img = random.randint(2)
+
+			offset = 0
+
+
+			if rand_img == 1 : #left 
+				source_path = batch_sample[rand_img]
+				filename = source_path.split('\\')[-1]
+				#print(filename)
+				current_path = image_path + filename
+				offset = 0.2
+			elif rand_img == 2 : #right 
+				source_path = batch_sample[rand_img]
+				filename = source_path.split('\\')[-1]
+				#print(filename)
+				current_path = image_path + filename
+				offset = -0.2
+			elif rand_img == 0 : #center 
+				source_path = batch_sample[rand_img]
+				filename = source_path.split('\\')[-1]
+				#print(filename)
+				current_path = image_path + filename
+
+			image = cv2.imread(current_path)
+			angle = float(batch_sample[3] + offset)
+
+			image, angle = augment_lr_image(image, angle)
+			images.append(image)
+			angles.append(angle)			
+		
+		x_train = np.array(images)
+		#print('x_train shape', x_train.shape)
+		y_train = np.array(angles)	
+		#print('y_train ', len(y_train))
+		yield shuffle(x_train, y_train)
+
 #based on LeNet Architecture
 def LeNet_model(ch, row, col):
 	model = Sequential()
@@ -216,6 +272,21 @@ def nvidia_model(ch, row, col, dropout=0.4):
 	return model;
 
 def main(_):
+	#check data collection
+	y1 = np.array(steer_angles)
+	h = plt.hist(y1, bins=100)
+	s = plt.savefig("hist1.png", format='png', bbox_inches='tight')
+	pp.pprint(describe(y1)._asdict())
+
+	#masking small angles
+	f = plt.figure()
+	p = lambda x: abs(x)<0.01
+	y2 = np.array([s for s in filterfalse(p,y1)])
+	h = plt.hist(y2,bins=100)
+	s = plt.savefig("hist2.png", format='png', bbox_inches='tight')
+	print("")
+	pp.pprint(describe(y2)._asdict())
+
 	train_generator = generator(train_samples, batch_size=128)
 	validation_generator = generator(validation_samples, batch_size=128)
 
