@@ -2,6 +2,7 @@ import os
 import csv
 import cv2
 import numpy as np
+import matplotlib.pyplot as plt
 import tensorflow as tf
 from sklearn.utils import shuffle
 from keras.models import Sequential
@@ -174,11 +175,20 @@ def main(_):
 	model.compile(loss='mse', optimizer='adam', metrics=['accuracy'])
 	#model.fit(x_train, y_train, validation_split=0.2, shuffle=True, nb_epoch=20)
 	early_stopping = EarlyStopping(monitor='val_loss', patience=2)
-	model.fit_generator(train_generator, samples_per_epoch= \
+	history_object = model.fit_generator(train_generator, samples_per_epoch= \
             len(train_samples), validation_data=validation_generator, \
             nb_val_samples=len(validation_samples), nb_epoch=3, callbacks=[early_stopping], verbose=1)
 
 	model.save('model.h5')
+
+	### plot the training and validation loss for each epoch
+	plt.plot(history_object.history['loss'])
+	plt.plot(history_object.history['val_loss'])
+	plt.title('model mean squared error loss')
+	plt.ylabel('mean squared error loss')
+	plt.xlabel('epoch')
+	plt.legend(['training set', 'validation set'], loc='upper right')
+	plt.show()
 
 if __name__ == '__main__':
     tf.app.run()
