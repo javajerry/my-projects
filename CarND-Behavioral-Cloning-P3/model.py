@@ -20,7 +20,7 @@ with open('driving_log.csv') as csvfile:
 	reader = csv.reader(csvfile)
 	for line in reader:
 		#ignore data when car isnt moving
-		if float(line[6]) > 0:
+		if float(line[4]) > 0 and float(line[6]) > 0:
 			samples.append(line)
 		else:
 			count += 1
@@ -69,7 +69,7 @@ def generator(samples, batch_size=32):
 				angles.append(angle)
 
 				#Add flipped image also. ignore  flipping is steering angle=0
-				if ( angle <> 0):
+				if ( angle != 0):
 					image = np.fliplr(image)
 					images.append(image)
 					angles.append(angle*-1.0)			
@@ -88,7 +88,7 @@ def generator(samples, batch_size=32):
 				angles.append(angle + correction)
 				
 				#Add flipped image also
-				if ( angle <> 0):
+				if ( angle != 0):
 					image = np.fliplr(image)
 					images.append(image)
 					angles.append((angle + correction)*-1.0)			
@@ -107,7 +107,7 @@ def generator(samples, batch_size=32):
 				angles.append(angle - correction)
 
 				#Add flipped image also
-				if ( angle <> 0):
+				if ( angle != 0):
 					image = np.fliplr(image)
 					images.append(image)
 					angles.append((angle - correction)*-1.0)			
@@ -136,17 +136,17 @@ def LeNet_model(ch, row, col):
 
 def nvidia_model(ch, row, col, dropout=0.4):
 	model = Sequential()
-	#model.add(Lambda(lambda x: (x / 255.0) - 0.5, input_shape=(row, col, ch)))
-	model.add(Lambda(lambda x: (x / 127.5) - 1., input_shape=(row, col, ch)))
+	model.add(Lambda(lambda x: (x / 255.0) - 0.5, input_shape=(row, col, ch)))
+	#model.add(Lambda(lambda x: (x / 127.5) - 1., input_shape=(row, col, ch)))
 	model.add(Cropping2D(cropping=((50,20), (0,0)), input_shape=(160,320,3)))
 	model.add(Convolution2D(24, 5, 5, subsample=(2,2), activation="relu"))
-	model.add(MaxPooling2D())	
+	#model.add(MaxPooling2D())	
 	model.add(Convolution2D(36, 5, 5, subsample=(2,2), activation="relu"))
-	model.add(MaxPooling2D())
+	#model.add(MaxPooling2D())
 	model.add(Convolution2D(48, 5, 5, subsample=(2,2), activation="relu"))
-	model.add(MaxPooling2D())
-	#model.add(Convolution2D(64, 3, 3, activation="relu"))
-	#model.add(Convolution2D(64, 3, 3, activation="relu"))	
+	#model.add(MaxPooling2D())
+	model.add(Convolution2D(64, 3, 3, activation="relu"))
+	model.add(Convolution2D(64, 3, 3, activation="relu"))	
 
 	model.add(Flatten())
 	model.add(Dense(100))
